@@ -7,11 +7,20 @@ provider "aws" {
 # ECR Repository
 resource "aws_ecr_repository" "learn_urdu" {
   name = "learn_urdu"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # ECS Cluster
 resource "aws_ecs_cluster" "learn_urdu_cluster" {
   name = "learn_urdu-cluster"
+
+  # Ignore changes to the cluster name to avoid conflicts with existing clusters
+  lifecycle {
+    ignore_changes = [name]
+  }
 }
 
 # IAM Role for ECS Task Execution
@@ -30,6 +39,10 @@ resource "aws_iam_role" "ecs_task_execution_role" {
       }
     ]
   })
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
@@ -60,6 +73,11 @@ resource "aws_ecs_task_definition" "learn_urdu_task" {
       ]
     }
   ])
+
+  # Ignore changes to the task definition family to avoid conflicts
+  lifecycle {
+    ignore_changes = [family]
+  }
 }
 
 # VPC, Subnets and Security Group
@@ -94,6 +112,10 @@ resource "aws_security_group" "learn_urdu_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    # prevent_destroy = true
+  }
 }
 
 # ECS Service
@@ -108,6 +130,11 @@ resource "aws_ecs_service" "learn_urdu_service" {
     subnets         = data.aws_subnets.default.ids
     security_groups = [aws_security_group.learn_urdu_sg.id]
     assign_public_ip = true
+  }
+
+  # Ignore changes to the service name to avoid conflicts
+  lifecycle {
+    ignore_changes = [name]
   }
 
   depends_on = [
