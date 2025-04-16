@@ -1,48 +1,34 @@
-# ECS and ECR setup to deploy Django (Learn_Urdu) using Terraform
-
+# Specify the AWS provider and region
 provider "aws" {
-  region = "ap-south-1"
+  region = var.region
 }
 
-# ECR Repository
-resource "aws_ecr_repository" "learn_urdu" {
-  name = "learn_urdu"
-
-  lifecycle {
-    prevent_destroy = true
-  }
+# ECR Repository to store Docker images
+resource "aws_ecr_repository" "learn_urdu_repo" {
+  name = "${var.project_name}-repo"
 }
 
-# ECS Cluster
+# ECS Cluster to manage containers
 resource "aws_ecs_cluster" "learn_urdu_cluster" {
-  name = "learn_urdu-cluster"
-
-  # Ignore changes to the cluster name to avoid conflicts with existing clusters
-  lifecycle {
-    ignore_changes = [name]
-  }
+  name = "${var.project_name}-cluster"
 }
 
 # IAM Role for ECS Task Execution
 resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "ecsTaskExecutionRole"
+  name = "${var.project_name}-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
         Principal = {
           Service = "ecs-tasks.amazonaws.com"
         }
       }
     ]
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
@@ -50,60 +36,74 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Task Definition
+# ECS Task Definition for the Django app
 resource "aws_ecs_task_definition" "learn_urdu_task" {
-  family                   = "learn_urdu-task"
+  family                   = "${var.project_name}-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "256"  # Minimal CPU to keep costs low
+  memory                   = "512"  # Minimal memory
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
-      name      = "learn_urdu"
-      image     = "${aws_ecr_repository.learn_urdu.repository_url}:latest"
+      name      = "${var.project_name}-container"
+      image     = "${aws_ecr_repository.learn_urdu_repo.repository_url}:latest"
       essential = true
       portMappings = [
         {
           containerPort = 8000
           hostPort      = 8000
-          protocol      = "tcp"
         }
       ]
     }
   ])
+}
 
-  # Ignore changes to the task definition family to avoid conflicts
-  lifecycle {
-    ignore_changes = [family]
+# Minimal VPC for ECS (cost-effective)
+resource "aws_vpc" "learn_urdu_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+}
+
+resource "aws_subnet" "learn_urdu_subnet" {
+  count             = 2
+  vpc_id            = aws_vpc.learn_urdu_vpc.id
+  cidr_block        = "10.0.${count.index}.0/24"
+  availability_zone = element(data.aws_availability_zones.available.names, count.index)
+}
+
+resource "aws_internet_gateway" "learn_urdu_igw" {
+  vpc_id = aws_vpc.learn_urdu_vpc.id
+}
+
+resource "aws_route_table" "learn_urdu_rt" {
+  vpc_id = aws_vpc.learn_urdu_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.learn_urdu_igw.id
   }
 }
 
-# VPC, Subnets and Security Group
-# Using default VPC for simplicity
-
-data "aws_vpc" "default" {
-  default = true
+resource "aws_route_table_association" "learn_urdu_rta" {
+  count          = 2
+  subnet_id      = aws_subnet.learn_urdu_subnet[count.index].id
+  route_table_id = aws_route_table.learn_urdu_rt.id
 }
 
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
+data "aws_availability_zones" "available" {}
 
+# Security Group to allow HTTP traffic
 resource "aws_security_group" "learn_urdu_sg" {
-  name        = "learn_urdu_sg"
-  description = "Allow inbound access on port 8000"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id = aws_vpc.learn_urdu_vpc.id
 
   ingress {
     from_port   = 8000
     to_port     = 8000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"]  # Allow public access (for learning)
   }
 
   egress {
@@ -112,32 +112,28 @@ resource "aws_security_group" "learn_urdu_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
 
-  lifecycle {
-    # prevent_destroy = true
+# ECS Service to run the Django app
+resource "aws_ecs_service" "learn_urdu_service" {
+  name            = "${var.project_name}-service"
+  cluster         = aws_ecs_cluster.learn_urdu_cluster.id
+  task_definition = aws_ecs_task_definition.learn_urdu_task.arn
+  desired_count   = 1  # Single task to minimize costs
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = aws_subnet.learn_urdu_subnet[*].id
+    security_groups  = [aws_security_group.learn_urdu_sg.id]
+    assign_public_ip = true  # Required for Fargate with public access
   }
 }
 
-# ECS Service
-resource "aws_ecs_service" "learn_urdu_service" {
-  name            = "learn_urdu-service"
-  cluster         = aws_ecs_cluster.learn_urdu_cluster.id
-  task_definition = aws_ecs_task_definition.learn_urdu_task.arn
-  launch_type     = "FARGATE"
-  desired_count   = 1
+# Outputs for easy reference
+output "ecr_repository_url" {
+  value = aws_ecr_repository.learn_urdu_repo.repository_url
+}
 
-  network_configuration {
-    subnets         = data.aws_subnets.default.ids
-    security_groups = [aws_security_group.learn_urdu_sg.id]
-    assign_public_ip = true
-  }
-
-  # Ignore changes to the service name to avoid conflicts
-  lifecycle {
-    ignore_changes = [name]
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.ecs_task_execution_role_policy
-  ]
+output "ecs_cluster_name" {
+  value = aws_ecs_cluster.learn_urdu_cluster.name
 }
