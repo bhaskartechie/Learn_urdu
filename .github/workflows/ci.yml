@@ -52,4 +52,4 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Update ECS service
         run: |
-          aws ecs update-service --cluster learn-urdu-cluster --service learn-urdu-service --force-new-deployment
+          aws ecs update-service --cluster learn-urdu-cluster --service learn_urdu-service --force-new-deployment
