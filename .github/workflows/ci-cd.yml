@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy_to_ecs:
-        description: "Deploy to ECS"
+        description: "Proceed after tests and deploy to ECS (check to continue)"
         required: true
         default: false
         type: boolean
@@ -31,17 +31,16 @@ jobs:
           pip install -r requirements.txt
       - name: Run tests
         run: python manage.py test
-      - name: Capture user input
-        if: success()
+      - name: Check user input
+        if: github.event.inputs.deploy_to_ecs != 'true'
         run: |
-          echo "Tests passed. Please provide your input:"
-          read user_input
-          echo "User input: $user_input"
+          echo "You must check the 'Proceed after tests and deploy to ECS' checkbox to continue."
+          exit 1
 
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_ecs == 'true'
+    if: github.event.inputs.deploy_to_ecs == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -72,7 +71,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_ecs == 'true'
+    if: github.event.inputs.deploy_to_ecs == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Configure AWS credentials
