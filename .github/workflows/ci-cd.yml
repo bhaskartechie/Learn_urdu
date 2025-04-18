@@ -1,9 +1,6 @@
-name: Learn Urdu CI/CD
+name: Learn Urdu CD
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       deploy_to_ecs:
@@ -14,7 +11,7 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL }} 
+  ECR_REPOSITORY_URL: ${{ secrets.ECR_REPOSITORY_URL }}  
 
 jobs:
   test:
@@ -31,11 +28,6 @@ jobs:
           pip install -r requirements.txt
       - name: Run tests
         run: python manage.py test
-      - name: Check user input
-        if: github.event.inputs.deploy_to_ecs != 'true'
-        run: |
-          echo "You must check the 'Proceed after tests and deploy to ECS' checkbox to continue."
-          exit 1
 
   build-and-push:
     needs: test
@@ -65,8 +57,8 @@ jobs:
             --cache-to=type=local,dest=/tmp/.buildx-cache \
             -t learn-urdu:latest \
             --push .
-          docker tag learn-urdu:latest ${{ secrets.ECR_REPOSITORY_URL }}:latest
-          docker push ${{ secrets.ECR_REPOSITORY_URL }}:latest
+          docker tag learn-urdu:latest $ECR_REPOSITORY_URL:latest
+          docker push $ECR_REPOSITORY_URL:latest
 
   deploy:
     needs: build-and-push
@@ -80,6 +72,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Update ECS service 
+      - name: Update ECS service
         run: |
           aws ecs update-service --cluster learn_urdu-cluster --service learn_urdu-service --force-new-deployment --region $AWS_REGION
