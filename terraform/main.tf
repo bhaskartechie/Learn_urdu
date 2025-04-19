@@ -41,8 +41,8 @@ resource "aws_ecs_task_definition" "learn_urdu_task" {
   family                   = "${var.project_name}-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"  # Minimal CPU to keep costs low
-  memory                   = "512"  # Minimal memory
+  cpu                      = "256"
+  memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
@@ -56,6 +56,20 @@ resource "aws_ecs_task_definition" "learn_urdu_task" {
           hostPort      = 8000
         }
       ]
+      environment = [
+        {
+          name  = "ENVIRONMENT"
+          value = "cloud"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/learn_urdu"
+          awslogs-region        = var.region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -103,7 +117,7 @@ resource "aws_security_group" "learn_urdu_sg" {
     from_port   = 8000
     to_port     = 8000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Allow public access (for learning)
+    cidr_blocks = ["0.0.0.0/0"] # Allow public access (for learning)
   }
 
   egress {
@@ -119,13 +133,13 @@ resource "aws_ecs_service" "learn_urdu_service" {
   name            = "${var.project_name}-service"
   cluster         = aws_ecs_cluster.learn_urdu_cluster.id
   task_definition = aws_ecs_task_definition.learn_urdu_task.arn
-  desired_count   = 1  # Single task to minimize costs
+  desired_count   = 1 # Single task to minimize costs
   launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = aws_subnet.learn_urdu_subnet[*].id
     security_groups  = [aws_security_group.learn_urdu_sg.id]
-    assign_public_ip = true  # Required for Fargate with public access
+    assign_public_ip = true # Required for Fargate with public access
   }
 }
 
