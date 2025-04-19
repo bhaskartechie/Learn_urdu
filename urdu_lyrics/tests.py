@@ -10,4 +10,4 @@ class HelloWorldViewTests(TestCase):
 
     def test_hello_world_response_content(self):
         response = self.client.get('/hello/')  # Adjust the URL if necessary
-        self.assertEqual(response.content.decode(), "Hello World, Learn Urdu, After optimizing the cicd")
+        self.assertEqual(response.content.decode(), "Hello World, Learn Urdu, after secret manager setup")
