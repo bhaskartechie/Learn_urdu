@@ -62,14 +62,6 @@ resource "aws_ecs_task_definition" "learn_urdu_task" {
           value = "cloud"
         }
       ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/learn_urdu"
-          awslogs-region        = var.region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
     }
   ])
 }
