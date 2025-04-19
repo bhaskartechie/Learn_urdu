@@ -25,7 +25,7 @@ if ENVIRONMENT == 'local':
 elif ENVIRONMENT == 'cloud':
     try:
         client = boto3.client('secretsmanager', region_name='ap-south-1')
-        response = client.get_secret_value(SecretId='learn_urdu/secret_key')
+        response = client.get_secret_value(SecretId='learn_urdu/secrets')
         SECRET_KEY = response['SecretString']
     except Exception as e:
         raise Exception(f"Failed to retrieve SECRET_KEY from Secrets Manager: {str(e)}")
