@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: cloud
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python

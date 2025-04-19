@@ -23,7 +23,7 @@ ENVIRONMENT = config('ENVIRONMENT', default='local')
 
 
 # Quick-start development settings - unsuitable for production
-DEBUG = ENVIRONMENT == 'local'  # True for local, False for cloud
+DEBUG = True  # True for local, False for cloud
 ALLOWED_HOSTS = ['*']  # Update for production
 
 # Application definition
