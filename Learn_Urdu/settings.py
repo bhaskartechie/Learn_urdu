@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import boto3
 from decouple import config
 from pathlib import Path
+import json
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,17 +21,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Environment-based SECRET_KEY configuration
 ENVIRONMENT = config('ENVIRONMENT', default='local')
 
-if ENVIRONMENT == 'local':
-    SECRET_KEY = config('SECRET_KEY')
-elif ENVIRONMENT == 'cloud':
-    try:
-        client = boto3.client('secretsmanager', region_name='ap-south-1')
-        response = client.get_secret_value(SecretId='learn_urdu/secrets')
-        SECRET_KEY = response['SecretString']
-    except Exception as e:
-        raise Exception(f"Failed to retrieve SECRET_KEY from Secrets Manager: {str(e)}")
-else:
-    raise ValueError("ENVIRONMENT must be 'local' or 'cloud'")
 
 # Quick-start development settings - unsuitable for production
 DEBUG = ENVIRONMENT == 'local'  # True for local, False for cloud
@@ -101,6 +91,22 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
+if ENVIRONMENT == 'local':
+    SECRET_KEY = config('SECRET_KEY')
+    INSTALLED_APPS = INSTALLED_APPS + [
+        'django_extensions',  # Optional: For development purposes
+    ]
+elif ENVIRONMENT == 'cloud':
+    try:
+        client = boto3.client('secretsmanager', region_name='ap-south-1')
+        response = client.get_secret_value(SecretId='learn_urdu/secrets')
+        secrets = json.loads(response['SecretString'])
+        SECRET_KEY = secrets.get('SECRET_KEY')
+    except Exception as e:
+        raise Exception(f"Failed to retrieve SECRET_KEY from Secrets Manager: {str(e)}")
+else:
+    raise ValueError("ENVIRONMENT must be 'local' or 'cloud'")
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
